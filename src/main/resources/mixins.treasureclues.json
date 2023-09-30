@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "compatibilityLevel": "JAVA_17",
+  "package": "com.buncord.treasureclues.mixin",
+  "refmap": "mixins.treasureclues.refmap.json",
+  "mixins": [
+  ],
+  "minVersion": "0.8.5"
+}
