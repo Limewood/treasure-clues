@@ -1,3 +1,11 @@
 {
-  "item.treasureclues.treasure_clue": "Mysterious note"
+  "item.treasureclues.treasure_clue": "Mysterious note, part %d",
+  "treasureclues.clue.text.desert_pyramid": "Parched of throat, with burning feet, I spied a temple made of sand.\n%2$d steps %1$s and %4$d hops %3$s, I'll leave a chest upon the land.",
+  "treasureclues.clue.text.not_found": "The note is too smudged to read, sorry.",
+  "treasureclues.clue.direction.north": "north",
+  "treasureclues.clue.direction.south": "south",
+  "treasureclues.clue.direction.west": "west",
+  "treasureclues.clue.direction.east": "east",
+  "treasureclues.clue.text.fallback": "Weary my feet, I will now take rest, go north ten steps and there find my chest.",
+  "treasureclues.invalid_dimension": "Dimensional interference prevents you from reading this note here."
 }
