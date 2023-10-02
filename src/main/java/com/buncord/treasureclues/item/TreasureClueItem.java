@@ -58,7 +58,9 @@ public class TreasureClueItem extends Item {
     private static final String USED_FEATURES_DELIMITER = ";";
     private static final String CLUE_TEXT_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.";
     private static final String DIRECTION_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.direction.";
-    private static final ResourceLocation LOOT_RESOURCE_LOCATION = new ResourceLocation(TreasureCluesMod.MOD_ID, "treasure/treasure");
+    private static final ResourceLocation LOOT_RESOURCE_LOCATION_3 = new ResourceLocation(TreasureCluesMod.MOD_ID, "treasure/treasure_3steps");
+    private static final ResourceLocation LOOT_RESOURCE_LOCATION_4 = new ResourceLocation(TreasureCluesMod.MOD_ID, "treasure/treasure_4steps");
+    private static final ResourceLocation LOOT_RESOURCE_LOCATION_5 = new ResourceLocation(TreasureCluesMod.MOD_ID, "treasure/treasure_5steps");
     private static final String INVALID_DIMENSION_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".invalid_dimension";
     private static final String CLUE_STEP_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.clue_step";
     private static final String READ_POS_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.read_position";
@@ -197,8 +199,13 @@ public class TreasureClueItem extends Item {
                         || availableFeatures.size() < MIN_AVAILABLE_FEATURES_LEFT
                         || step == MAX_STEP
                         || step > 1 && level.random.nextInt(MAX_STEP) < step) {
-                    // TODO Use different loot tables depending on number of steps
-                    entity.setLootTable(LOOT_RESOURCE_LOCATION, serverLevel.random.nextLong());
+                    // Use different loot tables depending on number of steps
+                    ResourceLocation lootTable = switch (step) {
+                        case 4 -> LOOT_RESOURCE_LOCATION_4;
+                        case 5 -> LOOT_RESOURCE_LOCATION_5;
+                        default -> LOOT_RESOURCE_LOCATION_3;
+                    };
+                    entity.setLootTable(lootTable, serverLevel.random.nextLong());
                 } else {
                     LazyOptional<IItemHandler> itemHandler = entity.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY);
                     itemHandler.ifPresent(
