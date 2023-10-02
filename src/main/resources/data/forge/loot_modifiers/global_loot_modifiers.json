@@ -1,6 +1,7 @@
 {
   "replace": false,
   "entries": [
-    "treasureclues:treasure_clues_locations"
+    "treasureclues:treasure_clues_locations",
+    "treasureclues:treasure_clue_in_village"
   ]
 }

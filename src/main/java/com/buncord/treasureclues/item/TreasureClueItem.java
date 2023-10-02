@@ -5,7 +5,9 @@ import com.buncord.treasureclues.WorldHeightHelper;
 import com.buncord.treasureclues.networking.ModNetwork;
 import com.buncord.treasureclues.networking.packet.OpenClueServerToClientPacket;
 import com.buncord.treasureclues.ui.ClueScreen;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -20,7 +22,9 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.levelgen.feature.StructureFeature;
@@ -30,6 +34,7 @@ import net.minecraftforge.items.IItemHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -43,16 +48,24 @@ public class TreasureClueItem extends Item {
     public static final String USED = "Used";
     public static final String CLUE_STEP = "ClueStep";
     public static final String FEATURE = "Feature";
+    public static final String BIOME = "Biome";
     public static final String NORTH_SOUTH_DIRECTION = "NorthSouthDirection";
     public static final String WEST_EAST_DIRECTION = "WestEastDirection";
     public static final String NORTH_SOUTH_DISTANCE = "NorthSouthDistance";
     public static final String WEST_EAST_DISTANCE = "WestEastDistance";
     public static final String USED_FEATURES = "UsedFeatures";
+    public static final String READ_POS = "ReadPos";
     private static final String USED_FEATURES_DELIMITER = ";";
     private static final String CLUE_TEXT_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.";
     private static final String DIRECTION_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.direction.";
     private static final ResourceLocation LOOT_RESOURCE_LOCATION = new ResourceLocation(TreasureCluesMod.MOD_ID, "treasure/treasure");
     private static final String INVALID_DIMENSION_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".invalid_dimension";
+    private static final String CLUE_STEP_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.clue_step";
+    private static final String READ_POS_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.read_position";
+    private static final String NOT_READ_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.not_read";
+    private static final String PRESS_SHIFT_FOR_INFO_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.press_shift";
+    private static final int MAX_STEP = 4; // 5 steps max (step is zero based)
+    private static final int MIN_AVAILABLE_FEATURES_LEFT = 3; // Minimum number of unused features before final chest
 
     public TreasureClueItem(Properties properties) {
         super(properties);
@@ -69,7 +82,7 @@ public class TreasureClueItem extends Item {
             // We are on the server
             ServerLevel serverLevel = (ServerLevel) level;
             ServerPlayer serverPlayer = (ServerPlayer) player;
-            BlockPos playerPos = serverPlayer.getOnPos();
+            BlockPos playerPos = serverPlayer.blockPosition();
 
             CompoundTag tag = itemStack.getOrCreateTag();
             if (tag.getBoolean(USED)) {
@@ -80,7 +93,10 @@ public class TreasureClueItem extends Item {
                 // Don't generate clue in the Nether or the End (for now)
                 return InteractionResultHolder.pass(itemStack);
             }
+            // Mark clue as read
             tag.putBoolean(USED, true);
+            // Save position where the clue was read
+            tag.putString(READ_POS, playerPos.toShortString());
             final int step = tag.getInt(CLUE_STEP);
             LOGGER.error("Used item with step " + step);
             // Find nearest structure feature
@@ -152,6 +168,16 @@ public class TreasureClueItem extends Item {
                 final DirectionsAndDistances dirDis = findDirectionsAndDistances(playerPos, safePos);
                 LOGGER.error("Direction: " + dirDis.westEastDirection + " : " + dirDis.northSouthDirection);
                 LOGGER.error("Distance: " + dirDis.westEastDistance + " : " + dirDis.northSouthDistance);
+                // Round distances
+                dirDis.northSouthDistance = Math.round(
+                        dirDis.northSouthDistance / 10f
+                ) * 10;
+                dirDis.westEastDistance = Math.round(
+                        dirDis.westEastDistance / 10f
+                ) * 10;
+
+                // Get biome
+                Biome.BiomeCategory biome = level.getBiome(safePos).getBiomeCategory();
 
                 String structureFeatureId;
                 if (!isFallbackChest) {
@@ -160,12 +186,18 @@ public class TreasureClueItem extends Item {
                     setFeature(tag, structureFeatureId);
                     // Save directions and distances
                     setDirectionsAndDistances(tag, dirDis);
+                    // Save biome
+                    setBiome(tag, biome);
                 } else {
                     structureFeatureId = null;
                 }
 
-                // Random chance, unless only 3 features left
-                if (isFallbackChest || availableFeatures.size() < 4) { // TODO Or random chance
+                // Random chance or max steps or min available features reached or fallback
+                if (isFallbackChest
+                        || availableFeatures.size() < MIN_AVAILABLE_FEATURES_LEFT
+                        || step == MAX_STEP
+                        || step > 1 && level.random.nextInt(MAX_STEP) < step) {
+                    // TODO Use different loot tables depending on number of steps
                     entity.setLootTable(LOOT_RESOURCE_LOCATION, serverLevel.random.nextLong());
                 } else {
                     LazyOptional<IItemHandler> itemHandler = entity.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY);
@@ -188,7 +220,8 @@ public class TreasureClueItem extends Item {
                 // Clue text
                 TranslatableComponent clueText = isFallbackChest ? generateFallbackText() : generateClueTextFor(
                         structureFeatureId,
-                        dirDis
+                        dirDis,
+                        biome
                 );
                 // Tell client to show note GUI
                 ModNetwork.sendToPlayer(new OpenClueServerToClientPacket(clueText), serverPlayer);
@@ -237,6 +270,37 @@ public class TreasureClueItem extends Item {
         return InteractionResultHolder.pass(itemStack);
     }
 
+    @Override
+    public void appendHoverText(@NotNull ItemStack itemStack, @Nullable Level level,
+                                @NotNull List<Component> components, @NotNull TooltipFlag flag) {
+        super.appendHoverText(itemStack, level, components, flag);
+        // Clue step
+        components.add(new TranslatableComponent(
+                        CLUE_STEP_TRANSLATION_ID,
+                        itemStack.getOrCreateTag().getInt(CLUE_STEP) + 1
+                ).withStyle(ChatFormatting.BLUE)
+        );
+        if (Screen.hasShiftDown()) {
+            if (itemStack.getOrCreateTag().getString(READ_POS).isBlank()) {
+                components.add(new TranslatableComponent(
+                                NOT_READ_TRANSLATION_ID
+                        ).withStyle(ChatFormatting.ITALIC)
+                );
+            } else {
+                components.add(new TranslatableComponent(
+                                READ_POS_TRANSLATION_ID,
+                                itemStack.getOrCreateTag().getString(READ_POS)
+                        ).withStyle(ChatFormatting.ITALIC)
+                );
+            }
+        } else {
+            components.add(new TranslatableComponent(
+                            PRESS_SHIFT_FOR_INFO_TRANSLATION_ID
+                    ).withStyle(ChatFormatting.AQUA)
+            );
+        }
+    }
+
     private StructureFeatureData findNextCluePos(List<String> availableFeatures, ServerLevel level, ServerPlayer player) {
         int structureIndex = level.random.nextInt(availableFeatures.size());
         LOGGER.error("Index: " + structureIndex + " array length: " + availableFeatures.size());
@@ -274,6 +338,10 @@ public class TreasureClueItem extends Item {
         compoundTag.putInt(WEST_EAST_DISTANCE, directionsAndDistances.westEastDistance);
     }
 
+    private void setBiome(CompoundTag compoundTag, Biome.BiomeCategory biome) {
+        compoundTag.putString(BIOME, biome.getName());
+    }
+
     private void setUsedFeaturesString(ItemStack itemStack, String[] usedFeatures, String newUsedFeature) {
         CompoundTag compoundTag = itemStack.getOrCreateTag();
         StringBuilder builder = new StringBuilder();
@@ -306,14 +374,16 @@ public class TreasureClueItem extends Item {
 
     private TranslatableComponent generateClueTextFor(
             String structureFeatureId,
-            DirectionsAndDistances directionsAndDistances
+            DirectionsAndDistances directionsAndDistances,
+            Biome.BiomeCategory biome
     ) {
-        return new TranslatableComponent(
-                getClueTextTranslationIdFor(structureFeatureId),
-                new TranslatableComponent(getDirectionTranslationIdFor(directionsAndDistances.northSouthDirection.getName())),
+        return getClueTextTranslationComponent(
+                structureFeatureId,
+                directionsAndDistances.northSouthDirection.getName(),
                 directionsAndDistances.northSouthDistance,
-                new TranslatableComponent(getDirectionTranslationIdFor(directionsAndDistances.westEastDirection.getName())),
-                directionsAndDistances.westEastDistance
+                directionsAndDistances.westEastDirection.getName(),
+                directionsAndDistances.westEastDistance,
+                biome.getName()
         );
     }
 
@@ -324,12 +394,32 @@ public class TreasureClueItem extends Item {
         String westEastDirectionName = tag.getString(WEST_EAST_DIRECTION);
         int northSouthDistance = tag.getInt(NORTH_SOUTH_DISTANCE);
         int westEastDistance = tag.getInt(WEST_EAST_DISTANCE);
+        String biomeName = tag.getString(BIOME);
+        return getClueTextTranslationComponent(
+                structureFeatureId,
+                northSouthDirectionName,
+                northSouthDistance,
+                westEastDirectionName,
+                westEastDistance,
+                biomeName
+        );
+    }
+
+    private TranslatableComponent getClueTextTranslationComponent(
+            String structureFeatureId,
+            String northSouthDirectionName,
+            int northSouthDistance,
+            String westEastDirectionName,
+            int westEastDistance,
+            String biome
+    ) {
         return new TranslatableComponent(
                 getClueTextTranslationIdFor(structureFeatureId),
                 new TranslatableComponent(getDirectionTranslationIdFor(northSouthDirectionName)),
                 northSouthDistance,
                 new TranslatableComponent(getDirectionTranslationIdFor(westEastDirectionName)),
-                westEastDistance
+                westEastDistance,
+                biome
         );
     }
 
@@ -356,14 +446,6 @@ public class TreasureClueItem extends Item {
             dirDis.northSouthDirection = Direction.NORTH;
         }
         return dirDis;
-    }
-
-    @Override
-    public @NotNull Component getName(@NotNull ItemStack itemStack) {
-        return new TranslatableComponent(
-                this.getDescriptionId(itemStack),
-                itemStack.getOrCreateTag().getInt(CLUE_STEP) + 1
-        );
     }
 
     private static class DirectionsAndDistances {

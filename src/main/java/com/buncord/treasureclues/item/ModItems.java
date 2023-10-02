@@ -13,7 +13,7 @@ public class ModItems {
             DeferredRegister.create(ForgeRegistries.ITEMS, TreasureCluesMod.MOD_ID);
 
     public static final RegistryObject<Item> TREASURE_CLUE = ITEMS.register("treasure_clue",
-            () -> new TreasureClueItem(new Item.Properties().tab(CreativeModeTab.TAB_MISC)));
+            () -> new TreasureClueItem(new Item.Properties().tab(CreativeModeTab.TAB_MISC).stacksTo(1)));
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
