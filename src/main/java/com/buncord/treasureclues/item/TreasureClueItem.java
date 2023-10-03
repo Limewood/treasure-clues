@@ -40,7 +40,6 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 public class TreasureClueItem extends Item {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -70,6 +69,7 @@ public class TreasureClueItem extends Item {
     private static final String BIOME_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.biome.";
     private static final int MAX_STEP = 4; // 5 steps max (step is zero based)
     private static final int MIN_AVAILABLE_FEATURES_LEFT = 3; // Minimum number of unused features before final chest
+    private static final double MAX_CLUE_DISTANCE = 3000; // Max distance to next clue, in blocks
 
     public TreasureClueItem(Properties properties) {
         super(properties);
@@ -102,20 +102,17 @@ public class TreasureClueItem extends Item {
             // Save position where the clue was read
             tag.putString(READ_POS, playerPos.toShortString());
             final int step = tag.getInt(CLUE_STEP);
-            LOGGER.error("Used item with step " + step);
+            LOGGER.debug("Used item with step " + step);
             // Find nearest structure feature
             // Remove already used features
             String usedFeaturesStr = tag.getString(USED_FEATURES);
             final String[] usedFeatures = !usedFeaturesStr.isEmpty()
                     ? usedFeaturesStr.split(USED_FEATURES_DELIMITER)
                     : new String[0];
-            LOGGER.error("Used features: " + Arrays.toString(usedFeatures));
             List<String> availableFeatures = new ArrayList<>(Arrays.stream(StructureFeatures.STRUCTURE_FEATURES).toList());
             for (String uf : usedFeatures) {
                 availableFeatures.remove(uf);
-                LOGGER.error("Removed used feature: " + uf);
             }
-            LOGGER.error("Available features: " + availableFeatures);
 
             // Get random structure type
             StructureFeatureData structureFeatureData = findNextCluePos(availableFeatures, serverLevel, serverPlayer);
@@ -140,7 +137,6 @@ public class TreasureClueItem extends Item {
                         serverLevel, featureBlockPos.getX(), zPos--, isUnderWaterFeature
                 );
             }
-            LOGGER.error("Safe pos: " + safePos);
             // Check if there is already a chest here
             ChestBlockEntity chest = (ChestBlockEntity) serverLevel.getBlockEntity(safePos);
             if (chest != null) {
@@ -157,6 +153,7 @@ public class TreasureClueItem extends Item {
                     chest = (ChestBlockEntity) serverLevel.getBlockEntity(safePos);
                 } while (chest != null);
             }
+            // TODO Check if block above is powdered snow?
             // Check if player is at this position
             if (safePos.equals(playerPos)) {
                 // Move it north one
@@ -166,12 +163,9 @@ public class TreasureClueItem extends Item {
             // Place chest at position
             serverLevel.setBlockAndUpdate(safePos, Blocks.CHEST.defaultBlockState());
             ChestBlockEntity entity = (ChestBlockEntity) serverLevel.getBlockEntity(safePos);
-            LOGGER.error("Entity: " + entity);
             if (entity != null) {
                 // Find approximate direction
                 final DirectionsAndDistances dirDis = findDirectionsAndDistances(playerPos, safePos);
-                LOGGER.error("Direction: " + dirDis.westEastDirection + " : " + dirDis.northSouthDirection);
-                LOGGER.error("Distance: " + dirDis.westEastDistance + " : " + dirDis.northSouthDistance);
                 // Round distances
                 dirDis.northSouthDistance = Math.round(
                         dirDis.northSouthDistance / 10f
@@ -243,7 +237,6 @@ public class TreasureClueItem extends Item {
                             above.getY(),
                             above.getZ()
                     );
-                    LOGGER.error("Command " + cmd);
                     player.sendMessage(new TextComponent(
                             String.format("Found %s at %d %d %d", structureFeatureId, safePos.getX(), safePos.getY(), safePos.getZ())
                     ).setStyle(
@@ -260,7 +253,7 @@ public class TreasureClueItem extends Item {
                 }
             } else {
                 // There is no chest where we placed it?!
-                LOGGER.error("No chest entity found at chest location");
+                LOGGER.error("No chest entity found at chest location!");
             }
         } else {
             // We are on the client
@@ -311,20 +304,27 @@ public class TreasureClueItem extends Item {
     }
 
     private StructureFeatureData findNextCluePos(List<String> availableFeatures, ServerLevel level, ServerPlayer player) {
-        int structureIndex = level.random.nextInt(availableFeatures.size());
-        LOGGER.error("Index: " + structureIndex + " array length: " + availableFeatures.size());
-        final String structureFeatureId = availableFeatures.get(structureIndex);
-        LOGGER.error("Structure feature id: " + structureFeatureId);
+        List<String> freeFeatures = new ArrayList<>(availableFeatures);
+        int structureIndex = level.random.nextInt(freeFeatures.size());
+        final String structureFeatureId = freeFeatures.get(structureIndex);
         StructureFeature<?> structureFeature = StructureFeature.STRUCTURES_REGISTRY.get(structureFeatureId);
-        LOGGER.error("Structure feature: " + structureFeature.getFeatureName());
+        LOGGER.debug("Found structure feature: " + structureFeatureId);
         BlockPos featureBlockPos = level.findNearestMapFeature(structureFeature, player.blockPosition(), 100, false);
-        LOGGER.error("Nearest feature block pos: " + featureBlockPos);
+        LOGGER.debug("Nearest feature block pos: " + featureBlockPos);
         StructureFeatureData data;
-        if (featureBlockPos == null && availableFeatures.size() > 1) {
-            availableFeatures.remove(structureFeatureId);
-            data = findNextCluePos(availableFeatures, level, player);
+        if (featureBlockPos == null && freeFeatures.size() > 1) {
+            freeFeatures.remove(structureFeatureId);
+            data = findNextCluePos(freeFeatures, level, player);
         } else if (featureBlockPos != null) {
-            data = new StructureFeatureData(structureFeature, featureBlockPos);
+            // Check if it's too far away
+            double distance = Math.sqrt(featureBlockPos.distSqr(player.blockPosition()));
+            if (distance > MAX_CLUE_DISTANCE && freeFeatures.size() > 1) {
+                LOGGER.debug("Too far to feature " + structureFeatureId + ", try another one");
+                freeFeatures.remove(structureFeatureId);
+                data = findNextCluePos(freeFeatures, level, player);
+            } else {
+                data = new StructureFeatureData(structureFeature, featureBlockPos);
+            }
         } else {
             data = null;
         }

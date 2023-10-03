@@ -32,7 +32,7 @@ public class ForgeEventBusEvents {
         // Give player a treasure clue once when they login (if the world is old enough)
         if (event.getEntity() instanceof Player player && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.getCapability(ClueReceivedProvider.CLUE_RECEIVED).ifPresent(clueReceived -> {
-                LOGGER.error("Time: " + event.getWorld().getGameTime());
+                LOGGER.debug("Age of world: " + event.getWorld().getGameTime());
                 if (!clueReceived.isReceived() && event.getWorld().getGameTime() > MIN_WORLD_AGE_FOR_FREE_CLUE) {
                     serverPlayer.addItem(new ItemStack(ModItems.TREASURE_CLUE.get()));
                     clueReceived.setReceived(true);
