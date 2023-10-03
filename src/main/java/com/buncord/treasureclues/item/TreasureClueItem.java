@@ -4,9 +4,8 @@ import com.buncord.treasureclues.TreasureCluesMod;
 import com.buncord.treasureclues.WorldHeightHelper;
 import com.buncord.treasureclues.networking.ModNetwork;
 import com.buncord.treasureclues.networking.packet.OpenClueServerToClientPacket;
-import com.buncord.treasureclues.ui.ClueScreen;
+import com.buncord.treasureclues.ui.ScreenHelper;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -28,7 +27,9 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.levelgen.feature.StructureFeature;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
 import org.apache.logging.log4j.LogManager;
@@ -260,7 +261,9 @@ public class TreasureClueItem extends Item {
             CompoundTag tag = itemStack.getOrCreateTag();
             if (tag.getBoolean(USED)) {
                 TranslatableComponent clueText = getClueText(tag);
-                Minecraft.getInstance().setScreen(new ClueScreen(clueText));
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+                    ScreenHelper.openClueScreen(clueText);
+                });
             }
             if (level.dimension() != Level.OVERWORLD) {
                 player.sendMessage(new TranslatableComponent(
