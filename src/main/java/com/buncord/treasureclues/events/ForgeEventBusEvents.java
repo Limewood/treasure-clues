@@ -17,17 +17,23 @@ import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
 
 @Mod.EventBusSubscriber(modid = TreasureCluesMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ForgeEventBusEvents {
+    private static final Logger LOGGER = LogManager.getLogger();
+    private static final int MIN_WORLD_AGE_FOR_FREE_CLUE = 24000 * 7; // 7 days
+
     @SubscribeEvent
     public static void onEntityJoinWorld(@Nonnull final EntityJoinWorldEvent event) {
-        // Give player a treasure clue once when they login
+        // Give player a treasure clue once when they login (if the world is old enough)
         if (event.getEntity() instanceof Player player && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.getCapability(ClueReceivedProvider.CLUE_RECEIVED).ifPresent(clueReceived -> {
-                if (!clueReceived.isReceived()) {
+                LOGGER.error("Time: " + event.getWorld().getGameTime());
+                if (!clueReceived.isReceived() && event.getWorld().getGameTime() > MIN_WORLD_AGE_FOR_FREE_CLUE) {
                     serverPlayer.addItem(new ItemStack(ModItems.TREASURE_CLUE.get()));
                     clueReceived.setReceived(true);
                 }

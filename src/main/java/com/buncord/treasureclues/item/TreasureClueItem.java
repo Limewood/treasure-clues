@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Locale;
 
 public class TreasureClueItem extends Item {
-
     private static final Logger LOGGER = LogManager.getLogger();
     public static final String USED = "Used";
     public static final String CLUE_STEP = "ClueStep";
@@ -66,6 +65,9 @@ public class TreasureClueItem extends Item {
     private static final String READ_POS_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.read_position";
     private static final String NOT_READ_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.not_read";
     private static final String PRESS_SHIFT_FOR_INFO_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".tooltip.press_shift";
+    private static final String ZERO_DISTANCE_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".clue.text.zero_distance";
+    private static final String STEPS_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.steps";
+    private static final String BIOME_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.biome.";
     private static final int MAX_STEP = 4; // 5 steps max (step is zero based)
     private static final int MIN_AVAILABLE_FEATURES_LEFT = 3; // Minimum number of unused features before final chest
 
@@ -360,9 +362,10 @@ public class TreasureClueItem extends Item {
     }
 
     private boolean isUnderWaterFeature(StructureFeature<?> structureFeature) {
-        return structureFeature.getFeatureName().equals(StructureFeatures.OCEAN_RUIN.toLowerCase(Locale.ROOT))
-                || structureFeature.getFeatureName().equals(StructureFeatures.SHIPWRECK.toLowerCase(Locale.ROOT))
-                || structureFeature.getFeatureName().equals(StructureFeatures.RUINED_PORTAL.toLowerCase(Locale.ROOT));
+        return structureFeature.getFeatureName().equals(StructureFeatures.OCEAN_RUIN)
+                || structureFeature.getFeatureName().equals(StructureFeatures.SHIPWRECK)
+                || structureFeature.getFeatureName().equals(StructureFeatures.RUINED_PORTAL)
+                || structureFeature.getFeatureName().equals(StructureFeatures.SWAMP_HUT);
     }
 
     private TranslatableComponent generateFallbackText() {
@@ -375,8 +378,8 @@ public class TreasureClueItem extends Item {
         return CLUE_TEXT_TRANSLATION_ID_PREFIX + structureFeatureId;
     }
 
-    private String getDirectionTranslationIdFor(String directionName) {
-        return DIRECTION_TRANSLATION_ID_PREFIX + directionName;
+    private TranslatableComponent getDirectionTranslationFor(String directionName) {
+        return new TranslatableComponent(DIRECTION_TRANSLATION_ID_PREFIX + directionName);
     }
 
     private TranslatableComponent generateClueTextFor(
@@ -422,12 +425,25 @@ public class TreasureClueItem extends Item {
     ) {
         return new TranslatableComponent(
                 getClueTextTranslationIdFor(structureFeatureId),
-                new TranslatableComponent(getDirectionTranslationIdFor(northSouthDirectionName)),
-                northSouthDistance,
-                new TranslatableComponent(getDirectionTranslationIdFor(westEastDirectionName)),
-                westEastDistance,
-                biome
+                getDirectionTranslationFor(northSouthDirectionName),
+                getDistanceTranslationFor(northSouthDistance),
+                getDirectionTranslationFor(westEastDirectionName),
+                getDistanceTranslationFor(westEastDistance),
+                getBiomeTranslationFor(biome)
         );
+    }
+
+    private TranslatableComponent getDistanceTranslationFor(int distance) {
+        if (distance == 0) {
+            return new TranslatableComponent(ZERO_DISTANCE_TRANSLATION_ID);
+        }
+        // Non-zero distance - pick a random step word
+        int variant = (int) Math.ceil(Math.random()*3);
+        return new TranslatableComponent(STEPS_TRANSLATION_ID_PREFIX + variant, distance);
+    }
+
+    private TranslatableComponent getBiomeTranslationFor(String biomeName) {
+        return new TranslatableComponent(BIOME_TRANSLATION_ID_PREFIX + biomeName);
     }
 
     private DirectionsAndDistances findDirectionsAndDistances(
@@ -444,12 +460,18 @@ public class TreasureClueItem extends Item {
         } else if (diff.getX() < 0) {
             // West
             dirDis.westEastDirection = Direction.WEST;
+        } else {
+            // Default
+            dirDis.westEastDirection = Direction.WEST;
         }
         if (diff.getZ() > 0) {
             // South
             dirDis.northSouthDirection = Direction.SOUTH;
         } else if (diff.getZ() < 0) {
             // North
+            dirDis.northSouthDirection = Direction.NORTH;
+        } else {
+            // Default
             dirDis.northSouthDirection = Direction.NORTH;
         }
         return dirDis;
