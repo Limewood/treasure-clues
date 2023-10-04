@@ -40,5 +40,6 @@
   "treasureclues.tooltip.clue_step": "Part %d",
   "treasureclues.tooltip.read_position": "Read at %s",
   "treasureclues.tooltip.not_read": "Read by right-clicking",
-  "treasureclues.tooltip.press_shift": "Press SHIFT for more info"
+  "treasureclues.tooltip.press_shift": "Press SHIFT for more info",
+  "treasureclues.error.missing_chest": "Oh no! Imps seems to have stolen the treasure! Sorry!"
 }

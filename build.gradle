@@ -17,7 +17,7 @@ apply plugin: 'maven-publish'
 // MixinGradle:
 apply plugin: 'org.spongepowered.mixin'
 
-version = '1.0'
+version = '1.1'
 group = 'com.buncord.treasureclues' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = 'treasure-clues'
 
@@ -201,7 +201,7 @@ jar {
         attributes([
                 "Specification-Title"     : "treasureclues",
                 "Specification-Vendor"    : "Limewood",
-                "Specification-Version"   : "1.0", // Mod version
+                "Specification-Version"   : "1.1", // Mod version
                 "Implementation-Title"    : project.name,
                 "Implementation-Version"  : project.jar.archiveVersion,
                 "Implementation-Vendor"   : "Limewood",

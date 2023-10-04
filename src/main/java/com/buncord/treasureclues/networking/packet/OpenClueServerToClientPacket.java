@@ -1,11 +1,8 @@
 package com.buncord.treasureclues.networking.packet;
 
-import com.buncord.treasureclues.ui.ClueScreen;
 import com.buncord.treasureclues.ui.ScreenHelper;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.world.item.Items;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
@@ -32,9 +29,7 @@ public class OpenClueServerToClientPacket {
         context.enqueueWork(() -> {
             // Here we are on the client
             // Open note GUI with clue text
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                ScreenHelper.openClueScreen(clueText);
-            });
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ScreenHelper.openClueScreen(clueText));
         });
 
         context.setPacketHandled(true);

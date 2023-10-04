@@ -68,6 +68,7 @@ public class TreasureClueItem extends Item {
     private static final String ZERO_DISTANCE_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".clue.text.zero_distance";
     private static final String STEPS_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.steps";
     private static final String BIOME_TRANSLATION_ID_PREFIX = TreasureCluesMod.MOD_ID + ".clue.text.biome.";
+    private static final String MISSING_CHEST_TRANSLATION_ID = TreasureCluesMod.MOD_ID + ".error.missing_chest";
     private static final int MAX_STEP = 4; // 5 steps max (step is zero based)
     private static final int MIN_AVAILABLE_FEATURES_LEFT = 3; // Minimum number of unused features before final chest
     private static final double MAX_CLUE_DISTANCE = 3000; // Max distance to next clue, in blocks
@@ -103,7 +104,7 @@ public class TreasureClueItem extends Item {
             // Save position where the clue was read
             tag.putString(READ_POS, playerPos.toShortString());
             final int step = tag.getInt(CLUE_STEP);
-            LOGGER.debug("Used item with step " + step);
+            LOGGER.info("Used item with step " + step);
             // Find nearest structure feature
             // Remove already used features
             String usedFeaturesStr = tag.getString(USED_FEATURES);
@@ -117,7 +118,7 @@ public class TreasureClueItem extends Item {
 
             // Get random structure type
             StructureFeatureData structureFeatureData = findNextCluePos(availableFeatures, serverLevel, serverPlayer);
-            BlockPos featureBlockPos = structureFeatureData.position;
+            BlockPos featureBlockPos = structureFeatureData != null ? structureFeatureData.position : null;
             boolean isUnderWaterFeature;
             boolean isFallbackChest = false;
             if (featureBlockPos == null) {
@@ -255,15 +256,16 @@ public class TreasureClueItem extends Item {
             } else {
                 // There is no chest where we placed it?!
                 LOGGER.error("No chest entity found at chest location!");
+                player.sendMessage(new TranslatableComponent(
+                        MISSING_CHEST_TRANSLATION_ID
+                ), player.getUUID());
             }
         } else {
             // We are on the client
             CompoundTag tag = itemStack.getOrCreateTag();
             if (tag.getBoolean(USED)) {
                 TranslatableComponent clueText = getClueText(tag);
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                    ScreenHelper.openClueScreen(clueText);
-                });
+                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ScreenHelper.openClueScreen(clueText));
             }
             if (level.dimension() != Level.OVERWORLD) {
                 player.sendMessage(new TranslatableComponent(
@@ -311,9 +313,9 @@ public class TreasureClueItem extends Item {
         int structureIndex = level.random.nextInt(freeFeatures.size());
         final String structureFeatureId = freeFeatures.get(structureIndex);
         StructureFeature<?> structureFeature = StructureFeature.STRUCTURES_REGISTRY.get(structureFeatureId);
-        LOGGER.debug("Found structure feature: " + structureFeatureId);
+        LOGGER.info("Found structure feature: " + structureFeatureId);
         BlockPos featureBlockPos = level.findNearestMapFeature(structureFeature, player.blockPosition(), 100, false);
-        LOGGER.debug("Nearest feature block pos: " + featureBlockPos);
+        LOGGER.info("Nearest feature block pos: " + featureBlockPos);
         StructureFeatureData data;
         if (featureBlockPos == null && freeFeatures.size() > 1) {
             freeFeatures.remove(structureFeatureId);
@@ -322,7 +324,7 @@ public class TreasureClueItem extends Item {
             // Check if it's too far away
             double distance = Math.sqrt(featureBlockPos.distSqr(player.blockPosition()));
             if (distance > MAX_CLUE_DISTANCE && freeFeatures.size() > 1) {
-                LOGGER.debug("Too far to feature " + structureFeatureId + ", try another one");
+                LOGGER.info("Too far to feature " + structureFeatureId + ", try another one");
                 freeFeatures.remove(structureFeatureId);
                 data = findNextCluePos(freeFeatures, level, player);
             } else {
@@ -441,7 +443,7 @@ public class TreasureClueItem extends Item {
             return new TranslatableComponent(ZERO_DISTANCE_TRANSLATION_ID);
         }
         // Non-zero distance - pick a random step word
-        int variant = (int) Math.ceil(Math.random()*3);
+        int variant = (int) Math.ceil(Math.random() * 3);
         return new TranslatableComponent(STEPS_TRANSLATION_ID_PREFIX + variant, distance);
     }
 
